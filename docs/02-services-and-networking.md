@@ -57,7 +57,7 @@ Both are `ClusterIP` — accessible inside the cluster only.
 
 The Ingress routes external traffic to the correct backend:
 
-- `/api/*` → `triage-backend:8000`
+- `/api/*` → `triage-backend:80`
 - `/*` → `triage-frontend:80`
 
 ```bash

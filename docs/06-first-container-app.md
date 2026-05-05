@@ -69,9 +69,49 @@ az containerapp create \
     `--ingress internal` means only other apps in the same environment can
     reach the backend. The frontend will be external.
 
-### Step 4 — Deploy the frontend
+### Step 4 — Enable managed identity and grant AI access
+
+The backend uses `DefaultAzureCredential` to call the AI model. Enable the
+system-assigned managed identity and grant it the required role:
 
 ```bash
+# Enable system-assigned identity
+az containerapp identity assign \
+  --name triage-backend \
+  --resource-group $RESOURCE_GROUP \
+  --system-assigned
+
+# Get the identity's principal ID
+BACKEND_PRINCIPAL_ID=$(az containerapp show \
+  --name triage-backend \
+  --resource-group $RESOURCE_GROUP \
+  --query identity.principalId -o tsv)
+
+# Grant Cognitive Services OpenAI User role on the AI resource
+AI_RESOURCE_ID=$(az resource list --resource-group $RESOURCE_GROUP \
+  --resource-type "Microsoft.CognitiveServices/accounts" --query "[0].id" -o tsv)
+
+az role assignment create \
+  --assignee $BACKEND_PRINCIPAL_ID \
+  --role "Cognitive Services OpenAI User" \
+  --scope "$AI_RESOURCE_ID"
+```
+
+!!! info
+    Role assignments can take 1–2 minutes to propagate. If triage fails
+    immediately after this step, wait a moment and retry.
+
+### Step 5 — Deploy the frontend
+
+The frontend nginx proxy needs to know the backend’s internal FQDN and that
+Container Apps internal ingress requires HTTPS:
+
+```bash
+BACKEND_FQDN=$(az containerapp show \
+  --name triage-backend \
+  --resource-group $RESOURCE_GROUP \
+  --query properties.configuration.ingress.fqdn -o tsv)
+
 az containerapp create \
   --name triage-frontend \
   --resource-group $RESOURCE_GROUP \
@@ -81,10 +121,18 @@ az containerapp create \
   --target-port 80 \
   --ingress external \
   --min-replicas 1 \
-  --max-replicas 5
+  --max-replicas 5 \
+  --env-vars "API_HOST=$BACKEND_FQDN" \
+             "API_SCHEME=https"
 ```
 
-### Step 5 — Get the frontend URL
+!!! note
+    The frontend image uses `envsubst` at startup to inject `API_HOST` and
+    `API_SCHEME` into the nginx config. On AKS, the defaults (`http` /
+    `triage-backend`) work via Kubernetes DNS. On Container Apps, internal
+    ingress requires the full FQDN and HTTPS.
+
+### Step 6 — Get the frontend URL
 
 ```bash
 az containerapp show \
@@ -95,20 +143,20 @@ az containerapp show \
 
 Open the URL in your browser (HTTPS is enabled automatically).
 
-### Step 6 — Test the backend
+### Step 7 — Test the backend
+
+Verify the frontend can reach the backend through its nginx proxy:
 
 ```bash
-BACKEND_FQDN=$(az containerapp show \
-  --name triage-backend \
+FRONTEND_FQDN=$(az containerapp show \
+  --name triage-frontend \
   --resource-group $RESOURCE_GROUP \
   --query properties.configuration.ingress.fqdn -o tsv)
 
-# Internal ingress — test from within the environment or use az containerapp exec
-az containerapp exec \
-  --name triage-frontend \
-  --resource-group $RESOURCE_GROUP \
-  --command -- curl -s http://triage-backend/api/health
+curl -s https://$FRONTEND_FQDN/api/health
 ```
+
+You should see `{"status": "healthy"}`.
 
 ## What this lab demonstrates
 

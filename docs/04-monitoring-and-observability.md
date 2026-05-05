@@ -84,22 +84,39 @@ KubeEvents
 ### Step 6 — Check resource utilisation
 
 ```kql
-Perf
-| where ObjectName == "K8SContainer"
-| where CounterName == "cpuUsageNanoCores"
-| where InstanceName contains "triage-backend"
-| summarize AvgCPU = avg(CounterValue) by bin(TimeGenerated, 5m)
+InsightsMetrics
+| where Namespace == "container.azm.ms/cpuUsage"
+| where Name == "cpuUsageNanoCores"
+| extend Pod = tostring(parse_json(Tags).podName)
+| where Pod contains "triage-backend"
+| summarize AvgCPU = avg(Val) by bin(TimeGenerated, 5m)
 | render timechart
 ```
 
+!!! note
+    CPU metrics may take 10–15 minutes to appear after enabling the monitoring
+    addon. If the query returns no results, verify data is flowing with:
+    `InsightsMetrics | where TimeGenerated > ago(15m) | take 5`
+
 ### Step 7 — Create a basic alert (Portal)
 
-1. Navigate to your AKS cluster → **Monitoring → Alerts**.
-2. Click **Create alert rule**.
-3. Choose signal: **Pods in failed state**.
-4. Set condition: count > 0.
+1. Navigate to your Log Analytics workspace → **Logs**.
+2. Run this query:
+
+```kql
+KubeEvents
+| where Namespace == "triage"
+| where Reason == "BackOff" or Reason == "Unhealthy" or Reason == "Failed"
+```
+
+3. Click **New alert rule** (top menu).
+4. Set condition: results greater than 0, evaluation period 5 minutes.
 5. Choose an action group (or create one with your email).
 6. Name the rule `triage-pod-failures` and create it.
+
+!!! tip
+    Log-based alerts query the Log Analytics workspace directly and don't
+    require Prometheus metric collection to be fully warmed up.
 
 ### Step 8 — View metrics from the CLI
 

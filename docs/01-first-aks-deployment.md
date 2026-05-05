@@ -126,7 +126,7 @@ kubectl get svc -n triage
 Test the backend health endpoint via port-forward:
 
 ```bash
-kubectl port-forward -n triage svc/triage-backend 8000:8000 &
+kubectl port-forward -n triage svc/triage-backend 8000:80 &
 curl http://localhost:8000/api/health
 ```
 

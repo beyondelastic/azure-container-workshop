@@ -141,16 +141,16 @@ LOCATION=eastus2
 ### Step 7 — Build and push container images
 
 ```bash
-az acr login --name $ACR_NAME
+source .env
 
-docker build -t $ACR_NAME.azurecr.io/triage-backend:v1 ./app/backend
-docker build -t $ACR_NAME.azurecr.io/triage-frontend:v1 ./app/frontend
-docker build -t $ACR_NAME.azurecr.io/triage-worker:v1 ./app/worker
-
-docker push $ACR_NAME.azurecr.io/triage-backend:v1
-docker push $ACR_NAME.azurecr.io/triage-frontend:v1
-docker push $ACR_NAME.azurecr.io/triage-worker:v1
+az acr build --registry $ACR_NAME --image triage-backend:v1 ./app/backend
+az acr build --registry $ACR_NAME --image triage-frontend:v1 ./app/frontend
+az acr build --registry $ACR_NAME --image triage-worker:v1 ./app/worker
 ```
+
+!!! tip
+    `az acr build` builds remotely in Azure, so you don’t need Docker
+    running locally and you avoid Docker Hub rate limits.
 
 ### Step 8 — Test locally (optional)
 
