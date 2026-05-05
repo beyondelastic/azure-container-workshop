@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: triage-config
+  namespace: triage
+data:
+  AZURE_AI_MODEL_DEPLOYMENT: "gpt-4.1-mini"
+  AZURE_CLIENT_ID: "<KUBELET_MANAGED_IDENTITY_CLIENT_ID>"

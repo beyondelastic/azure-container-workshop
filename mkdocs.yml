@@ -1,0 +1,53 @@
+site_name: Azure Container Workshop
+site_description: Beginner-friendly AKS & Azure Container Apps workshop with healthcare AI scenarios.
+site_url: https://beyondelastic.github.io/azure-container-workshop/
+repo_name: azure-container-workshop
+repo_url: https://github.com/beyondelastic/azure-container-workshop
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: cyan
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/external-links.js
+
+nav:
+  - Home: index.md
+  - 00 Prerequisites: 00-prereqs.md
+  - "AKS":
+    - 01 Your First AKS Deployment: 01-first-aks-deployment.md
+    - 02 Services & Networking: 02-services-and-networking.md
+    - 03 Scaling & Configuration: 03-scaling-and-configuration.md
+    - 04 Monitoring & Observability: 04-monitoring-and-observability.md
+    - 05 AKS Automatic: 05-aks-automatic.md
+  - "Azure Container Apps":
+    - 06 Your First Container App: 06-first-container-app.md
+    - 07 Scaling & Revisions: 07-scaling-and-revisions.md
+    - 08 Multi-Container & Dapr: 08-multi-container-and-dapr.md
+    - 09 Jobs & Background Processing: 09-jobs-and-background-processing.md

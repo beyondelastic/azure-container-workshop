@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: triage-frontend
+  namespace: triage
+spec:
+  selector:
+    app: triage-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
