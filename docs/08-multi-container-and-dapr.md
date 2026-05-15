@@ -108,29 +108,31 @@ az containerapp dapr enable \
 
 ### Step 4 — Create the Redis state store component
 
+Save the component definition to a file and apply it:
+
 ```bash
-az containerapp env dapr-component set \
-  --name $CONTAINERAPPS_ENVIRONMENT \
-  --resource-group $RESOURCE_GROUP \
-  --dapr-component-name statestore \
-  --yaml - <<EOF
+cat > /tmp/statestore.yaml <<EOF
 componentType: state.redis
 version: v1
 metadata:
   - name: redisHost
     value: "${REDIS_HOST}:6379"
-  - name: redisPassword
-    value: ""
   - name: enableTLS
     value: "false"
 scopes:
   - triage-backend
 EOF
+
+az containerapp env dapr-component set \
+  --name $CONTAINERAPPS_ENVIRONMENT \
+  --resource-group $RESOURCE_GROUP \
+  --dapr-component-name statestore \
+  --yaml /tmp/statestore.yaml
 ```
 
 !!! note
     The Redis container has no password and no TLS — fine for a workshop.
-    For a managed Azure Cache for Redis you would set `enableTLS: "true"`,
+    For a managed Azure Cache for Redis you would add `enableTLS: "true"`,
     use port `6380`, and provide the access key via a Container Apps secret.
 
 ### Step 5 — Test service invocation
