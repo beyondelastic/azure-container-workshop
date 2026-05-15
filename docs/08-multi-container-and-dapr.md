@@ -15,7 +15,7 @@ component for persisting patient triage data.
 - [Dapr integration with Container Apps](https://learn.microsoft.com/azure/container-apps/dapr-overview)
 - [Dapr service invocation](https://learn.microsoft.com/azure/container-apps/dapr-service-invocation)
 - [Dapr state store component](https://learn.microsoft.com/azure/container-apps/dapr-component-connection)
-- [Connect to Azure Cache for Redis](https://learn.microsoft.com/azure/container-apps/dapr-component-connection?tabs=bash&pivots=azure-cache-for-redis)
+- [Container Apps as Dapr component backends](https://learn.microsoft.com/azure/container-apps/dapr-component-connection)
 
 ## Key concepts
 
@@ -34,31 +34,55 @@ graph LR
     DS1 -->|service invocation| DS2[Dapr Sidecar]
     DS2 --> BE[Backend]
     BE --> DS2
-    DS2 -->|state store| R[(Redis)]
+    DS2 -->|state store| R[(Redis Container)]
 ```
 
 ## Exercise
 
-### Step 1 — Create an Azure Cache for Redis
+### Step 1 — Deploy a Redis container
+
+Instead of provisioning a managed Azure Cache for Redis (which takes 15+
+minutes), deploy Redis as a Container App in the same environment. This is
+instant and keeps everything self-contained:
 
 ```bash
-export REDIS_NAME=redis-triage-$RANDOM
+source .env
 
-az redis create \
-  --name $REDIS_NAME \
+az containerapp create \
+  --name redis \
   --resource-group $RESOURCE_GROUP \
-  --location $LOCATION \
-  --sku Basic \
-  --vm-size c0
+  --environment $CONTAINERAPPS_ENVIRONMENT \
+  --image docker.io/redis:7-alpine \
+  --target-port 6379 \
+  --ingress internal \
+  --min-replicas 1 \
+  --max-replicas 1 \
+  --cpu 0.25 \
+  --memory 0.5Gi
 ```
 
-Wait for provisioning (a few minutes), then get the connection details:
+Get the internal FQDN:
 
 ```bash
-REDIS_HOST=$(az redis show --name $REDIS_NAME --resource-group $RESOURCE_GROUP --query hostName -o tsv)
-REDIS_KEY=$(az redis list-keys --name $REDIS_NAME --resource-group $RESOURCE_GROUP --query primaryKey -o tsv)
-REDIS_PORT=6380
+REDIS_HOST=$(az containerapp show \
+  --name redis \
+  --resource-group $RESOURCE_GROUP \
+  --query properties.configuration.ingress.fqdn -o tsv)
+
+echo "Redis FQDN: $REDIS_HOST"
 ```
+
+!!! tip "Production: use Azure Cache for Redis"
+    For a workshop, a Redis container is fast and free. In production, use
+    [Azure Cache for Redis](https://learn.microsoft.com/azure/azure-cache-for-redis/cache-overview)
+    or [Azure Managed Redis](https://learn.microsoft.com/azure/azure-cache-for-redis/managed-redis-overview)
+    for durability, TLS, backups, and an SLA.
+
+    The beauty of Dapr is that **switching is a config change, not a code
+    change**. Just update the component metadata to point at the managed
+    service — add `enableTLS: "true"`, swap the host/password, and your
+    app code stays identical. This same pluggability works with Cosmos DB,
+    Azure SQL, Service Bus, Event Hubs, and other Azure PaaS services.
 
 ### Step 2 — Enable Dapr on the backend
 
@@ -94,15 +118,20 @@ componentType: state.redis
 version: v1
 metadata:
   - name: redisHost
-    value: "${REDIS_HOST}:${REDIS_PORT}"
+    value: "${REDIS_HOST}:6379"
   - name: redisPassword
-    value: "${REDIS_KEY}"
+    value: ""
   - name: enableTLS
-    value: "true"
+    value: "false"
 scopes:
   - triage-backend
 EOF
 ```
+
+!!! note
+    The Redis container has no password and no TLS — fine for a workshop.
+    For a managed Azure Cache for Redis you would set `enableTLS: "true"`,
+    use port `6380`, and provide the access key via a Container Apps secret.
 
 ### Step 5 — Test service invocation
 
