@@ -99,6 +99,25 @@ Enabling Dapr creates a new revision with a sidecar container. The sidecar
 injects the `DAPR_HTTP_PORT` environment variable — the backend code detects
 this and automatically switches from in-memory storage to the Dapr state store.
 
+!!! info "How the backend integrates with Dapr"
+    The backend code (`app/backend/main.py`) already includes Dapr state
+    support. It checks for the `DAPR_HTTP_PORT` environment variable at
+    startup — if present, it persists patients to the Dapr state store via
+    HTTP calls to `localhost:3500`. If absent (e.g. in our earlier AKS
+    lessons where Dapr is not configured), it falls back to an in-memory
+    dictionary.
+
+    AKS fully supports Dapr as a
+    [managed extension](https://learn.microsoft.com/azure/aks/dapr) —
+    we simply don't cover it in this workshop.
+
+    In a real-world scenario, you would need to **modify your application
+    code** to call the Dapr HTTP or gRPC API (or use a Dapr SDK). Dapr does
+    not magically intercept your existing storage calls — you must explicitly
+    use its state management API. The benefit is that the *backing store*
+    (Redis, Cosmos DB, PostgreSQL, etc.) becomes a configuration choice
+    rather than a code change.
+
 ### Step 3 — Enable Dapr on the frontend
 
 ```bash
