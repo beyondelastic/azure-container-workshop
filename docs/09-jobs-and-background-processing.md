@@ -36,12 +36,17 @@ Deploy the batch worker as a scheduled job that runs at 2 AM UTC daily:
 ```bash
 source .env
 
+# Enable admin credentials on ACR (needed for job registry auth)
+az acr update --name $ACR_NAME --admin-enabled true
+
 az containerapp job create \
   --name triage-batch-job \
   --resource-group $RESOURCE_GROUP \
   --environment $CONTAINERAPPS_ENVIRONMENT \
   --image $ACR_NAME.azurecr.io/triage-worker:v1 \
   --registry-server $ACR_NAME.azurecr.io \
+  --registry-username $ACR_NAME \
+  --registry-password "$(az acr credential show --name $ACR_NAME --query 'passwords[0].value' -o tsv)" \
   --trigger-type Schedule \
   --cron-expression "0 2 * * *" \
   --replica-timeout 600 \
@@ -96,6 +101,8 @@ az containerapp job create \
   --environment $CONTAINERAPPS_ENVIRONMENT \
   --image $ACR_NAME.azurecr.io/triage-worker:v1 \
   --registry-server $ACR_NAME.azurecr.io \
+  --registry-username $ACR_NAME \
+  --registry-password "$(az acr credential show --name $ACR_NAME --query 'passwords[0].value' -o tsv)" \
   --trigger-type Manual \
   --replica-timeout 600 \
   --replica-retry-limit 1 \
