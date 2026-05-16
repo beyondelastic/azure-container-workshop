@@ -54,7 +54,35 @@ az containerapp update \
 This means: when each replica handles more than 20 concurrent requests, add
 another replica.
 
-### Step 3 — Enable multiple revisions
+### Step 3 — Observe in-memory state inconsistency
+
+With multiple replicas, the backend's in-memory patient store becomes
+unreliable. Each replica has its own memory — data submitted to one replica is
+invisible to the other.
+
+Force two replicas to make this observable:
+
+```bash
+az containerapp update \
+  --name triage-backend \
+  --resource-group $RESOURCE_GROUP \
+  --min-replicas 2 \
+  --max-replicas 10
+```
+
+Now open the frontend UI and submit a new patient. Refresh the patient list
+several times — you will see the patient appear and disappear depending on
+which replica handles the request.
+
+!!! warning "Why does this happen?"
+    Each replica runs its own Python process with a separate in-memory `dict`.
+    The load balancer round-robins between them, so reads may hit a different
+    replica than the one that received the write.
+
+    We fix this in **Lesson 08** by adding a shared Redis state store via Dapr,
+    so all replicas read/write from the same backing store.
+
+### Step 4 — Enable multiple revisions
 
 By default, Container Apps operates in single-revision mode. Enable
 multi-revision mode to support traffic splitting:
@@ -66,7 +94,7 @@ az containerapp revision set-mode \
   --mode multiple
 ```
 
-### Step 4 — Note the current revision name
+### Step 5 — Note the current revision name
 
 ```bash
 az containerapp revision list \
@@ -77,7 +105,7 @@ az containerapp revision list \
 
 Save this — it is the "blue" revision.
 
-### Step 5 — Deploy a new revision (green)
+### Step 6 — Deploy a new revision (green)
 
 Deploy with a label for easy identification:
 
@@ -90,7 +118,7 @@ az containerapp update \
   --set-env-vars "APP_VERSION=v2"
 ```
 
-### Step 6 — List revisions
+### Step 7 — List revisions
 
 ```bash
 az containerapp revision list \
@@ -101,7 +129,7 @@ az containerapp revision list \
 
 You should see two active revisions.
 
-### Step 7 — Split traffic 80/20
+### Step 8 — Split traffic 80/20
 
 ```bash
 BLUE_REVISION=$(az containerapp revision list \
@@ -120,7 +148,7 @@ az containerapp ingress traffic set \
   --revision-weight "$BLUE_REVISION=80" "$GREEN_REVISION=20"
 ```
 
-### Step 8 — Verify traffic split
+### Step 9 — Verify traffic split
 
 ```bash
 az containerapp ingress traffic show \
@@ -128,7 +156,7 @@ az containerapp ingress traffic show \
   --resource-group $RESOURCE_GROUP
 ```
 
-### Step 9 — Promote green to 100%
+### Step 10 — Promote green to 100%
 
 Once satisfied, shift all traffic to the green revision:
 
@@ -139,7 +167,7 @@ az containerapp ingress traffic set \
   --revision-weight "$GREEN_REVISION=100"
 ```
 
-### Step 10 — Deactivate the old revision
+### Step 11 — Deactivate the old revision
 
 ```bash
 az containerapp revision deactivate \

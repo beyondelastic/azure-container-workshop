@@ -4,11 +4,14 @@ Accepts patient symptoms, calls a model deployed in Microsoft Foundry
 to classify urgency, and returns structured triage results.
 """
 
+import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import requests
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 from fastapi import FastAPI, HTTPException
@@ -17,6 +20,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 app = FastAPI(title="Patient Triage API", version="1.0.0")
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,9 +30,65 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# In-memory store (replaced by Redis/Dapr state store in later lessons)
+# State store — uses Dapr when available, falls back to in-memory
 # ---------------------------------------------------------------------------
-patients: dict[str, dict] = {}
+DAPR_PORT = os.environ.get("DAPR_HTTP_PORT")
+DAPR_STATE_URL = f"http://localhost:{DAPR_PORT}/v1.0/state/statestore" if DAPR_PORT else None
+PATIENT_INDEX_KEY = "patient-index"
+
+# In-memory fallback (used when Dapr is not available, e.g. AKS lessons)
+_patients_memory: dict[str, dict] = {}
+
+
+def _dapr_available() -> bool:
+    return DAPR_STATE_URL is not None
+
+
+def save_patient(record: dict) -> None:
+    """Persist a patient record."""
+    if _dapr_available():
+        # Save the patient record and update the index
+        index = _get_patient_index()
+        index.append(record["id"])
+        requests.post(DAPR_STATE_URL, json=[
+            {"key": record["id"], "value": record},
+            {"key": PATIENT_INDEX_KEY, "value": index},
+        ], timeout=5)
+    else:
+        _patients_memory[record["id"]] = record
+
+
+def get_all_patients() -> list[dict]:
+    """Retrieve all patient records."""
+    if _dapr_available():
+        index = _get_patient_index()
+        patients = []
+        for patient_id in index:
+            resp = requests.get(f"{DAPR_STATE_URL}/{patient_id}", timeout=5)
+            if resp.status_code == 200 and resp.text:
+                patients.append(resp.json())
+        return patients
+    else:
+        return list(_patients_memory.values())
+
+
+def clear_all_patients() -> None:
+    """Delete all patient records."""
+    if _dapr_available():
+        index = _get_patient_index()
+        for patient_id in index:
+            requests.delete(f"{DAPR_STATE_URL}/{patient_id}", timeout=5)
+        requests.delete(f"{DAPR_STATE_URL}/{PATIENT_INDEX_KEY}", timeout=5)
+    else:
+        _patients_memory.clear()
+
+
+def _get_patient_index() -> list[str]:
+    """Get the list of patient IDs from the state store."""
+    resp = requests.get(f"{DAPR_STATE_URL}/{PATIENT_INDEX_KEY}", timeout=5)
+    if resp.status_code == 200 and resp.text:
+        return resp.json()
+    return []
 
 # ---------------------------------------------------------------------------
 # Microsoft Foundry client
@@ -112,8 +172,6 @@ def triage_patient(req: TriageRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Model call failed: {exc}")
 
-    import json
-
     try:
         result = json.loads(response.choices[0].message.content)
     except (json.JSONDecodeError, IndexError) as exc:
@@ -128,16 +186,16 @@ def triage_patient(req: TriageRequest):
         "reasoning": result.get("reasoning", ""),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    patients[record["id"]] = record
+    save_patient(record)
     return record
 
 
 @app.get("/api/patients", response_model=list[TriageResult])
 def list_patients():
-    return sorted(patients.values(), key=lambda p: p["timestamp"], reverse=True)
+    return sorted(get_all_patients(), key=lambda p: p["timestamp"], reverse=True)
 
 
 @app.delete("/api/patients")
 def clear_patients():
-    patients.clear()
+    clear_all_patients()
     return {"status": "cleared"}
