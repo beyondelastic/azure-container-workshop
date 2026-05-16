@@ -153,13 +153,22 @@ service invocation is working between containers.
 
 ### Step 6 — Test the state store
 
-Save and retrieve state via Dapr:
+Save state via Dapr:
 
 ```bash
 az containerapp exec \
   --name triage-backend \
   --resource-group $RESOURCE_GROUP \
-  --command "sh -c 'curl -s -X POST http://localhost:3500/v1.0/state/statestore -H \"Content-Type: application/json\" -d \"[{\\\"key\\\":\\\"patient-001\\\",\\\"value\\\":{\\\"name\\\":\\\"Jane Doe\\\",\\\"urgency\\\":\\\"High\\\"}}]\" && echo && curl -s http://localhost:3500/v1.0/state/statestore/patient-001'"
+  --command "curl -s -X POST http://localhost:3500/v1.0/state/statestore -H Content-Type:application/json -d [{\"key\":\"patient-001\",\"value\":{\"name\":\"Jane Doe\",\"urgency\":\"High\"}}]"
+```
+
+Retrieve it:
+
+```bash
+az containerapp exec \
+  --name triage-backend \
+  --resource-group $RESOURCE_GROUP \
+  --command "curl -s http://localhost:3500/v1.0/state/statestore/patient-001"
 ```
 
 ### Step 7 — List Dapr components
