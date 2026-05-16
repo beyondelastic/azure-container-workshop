@@ -13,9 +13,14 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 
 SYSTEM_PROMPT = """You are a clinical triage assistant performing batch review.
-Given a list of patient records with symptoms, produce a JSON array of objects:
-[{"patient": "<name>", "urgency": "<Critical|High|Medium|Low>", "summary": "<one line>"}]
-Respond with ONLY the JSON array."""
+Given a list of patient records with symptoms, classify each patient's urgency.
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "patients": [
+    {"patient": "<name>", "urgency": "<Critical|High|Medium|Low>", "summary": "<one-sentence reasoning>"}
+  ]
+}"""
 
 SAMPLE_PATIENTS = [
     {"name": "Maria Garcia", "age": 67, "symptoms": "chest tightness, shortness of breath, dizziness"},
@@ -31,7 +36,7 @@ def run_batch():
         endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"],
         credential=DefaultAzureCredential(),
     )
-    client = project_client.inference.get_chat_completions_client()
+    client = project_client.get_openai_client()
     deployment = os.environ.get("AZURE_AI_MODEL_DEPLOYMENT", "gpt-4.1-mini")
 
     patient_text = "\n".join(
@@ -51,20 +56,22 @@ def run_batch():
     )
 
     content = response.choices[0].message.content
-    # The model may wrap the array in an object; handle both cases
     parsed = json.loads(content)
+
+    # Extract the patients list from the response object
     if isinstance(parsed, dict):
-        # Find the first list value
-        for v in parsed.values():
-            if isinstance(v, list):
-                parsed = v
-                break
+        results = parsed.get("patients", [])
+    elif isinstance(parsed, list):
+        results = parsed
+    else:
+        results = []
 
     print("\n=== Batch Triage Report ===\n")
-    for item in parsed:
-        print(f"  [{item.get('urgency', '?'):>8}]  {item.get('patient', '?')} — {item.get('summary', '')}")
+    for item in results:
+        if isinstance(item, dict):
+            print(f"  [{item.get('urgency', '?'):>8}]  {item.get('patient', '?')} — {item.get('summary', '')}")
 
-    print(f"\n[{datetime.now(timezone.utc).isoformat()}] Batch triage complete. Processed {len(parsed)} records.")
+    print(f"\n[{datetime.now(timezone.utc).isoformat()}] Batch triage complete. Processed {len(results)} records.")
     return 0
 
 

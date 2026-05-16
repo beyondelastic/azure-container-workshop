@@ -58,7 +58,36 @@ az containerapp job create \
              "AZURE_AI_MODEL_DEPLOYMENT=$AZURE_AI_MODEL_DEPLOYMENT"
 ```
 
-### Step 2 — Trigger the scheduled job manually (for testing)
+### Step 2 — Assign managed identity and grant AI access
+
+The job uses `DefaultAzureCredential` to call the AI model. Assign a
+system-assigned identity and grant it the required role:
+
+```bash
+az containerapp job identity assign \
+  --name triage-batch-job \
+  --resource-group $RESOURCE_GROUP \
+  --system-assigned
+
+JOB_PRINCIPAL_ID=$(az containerapp job show \
+  --name triage-batch-job \
+  --resource-group $RESOURCE_GROUP \
+  --query identity.principalId -o tsv)
+
+AI_RESOURCE_ID=$(az resource list --resource-group $RESOURCE_GROUP \
+  --resource-type "Microsoft.CognitiveServices/accounts" --query "[0].id" -o tsv)
+
+az role assignment create \
+  --assignee $JOB_PRINCIPAL_ID \
+  --role "Cognitive Services OpenAI User" \
+  --scope "$AI_RESOURCE_ID"
+```
+
+!!! info
+    Role assignments can take 1–2 minutes to propagate. Wait a moment
+    before triggering the job.
+
+### Step 3 — Trigger the scheduled job manually (for testing)
 
 Don't wait until 2 AM — start an execution now:
 
@@ -68,7 +97,7 @@ az containerapp job start \
   --resource-group $RESOURCE_GROUP
 ```
 
-### Step 3 — View execution history
+### Step 4 — View execution history
 
 ```bash
 az containerapp job execution list \
@@ -77,19 +106,20 @@ az containerapp job execution list \
   -o table
 ```
 
-### Step 4 — View job logs
+### Step 5 — View job logs
 
 ```bash
 az containerapp job logs show \
   --name triage-batch-job \
   --resource-group $RESOURCE_GROUP \
+  --container triage-batch-job \
   --follow
 ```
 
 You should see the batch triage report with urgency classifications for the
 sample patients.
 
-### Step 5 — Create a manual-trigger job
+### Step 6 — Create a manual-trigger job
 
 Create a second job that runs only when explicitly triggered — useful for
 on-demand reports:
@@ -111,9 +141,25 @@ az containerapp job create \
   --secrets "project-endpoint=$AZURE_AI_PROJECT_ENDPOINT" \
   --env-vars "AZURE_AI_PROJECT_ENDPOINT=secretref:project-endpoint" \
              "AZURE_AI_MODEL_DEPLOYMENT=$AZURE_AI_MODEL_DEPLOYMENT"
+
+# Assign identity and grant AI access (same as the batch job)
+az containerapp job identity assign \
+  --name triage-report-job \
+  --resource-group $RESOURCE_GROUP \
+  --system-assigned
+
+REPORT_PRINCIPAL_ID=$(az containerapp job show \
+  --name triage-report-job \
+  --resource-group $RESOURCE_GROUP \
+  --query identity.principalId -o tsv)
+
+az role assignment create \
+  --assignee $REPORT_PRINCIPAL_ID \
+  --role "Cognitive Services OpenAI User" \
+  --scope "$AI_RESOURCE_ID"
 ```
 
-### Step 6 — Run the manual job
+### Step 7 — Run the manual job
 
 ```bash
 az containerapp job start \
@@ -121,7 +167,7 @@ az containerapp job start \
   --resource-group $RESOURCE_GROUP
 ```
 
-### Step 7 — Compare execution history
+### Step 8 — Compare execution history
 
 ```bash
 # Scheduled job
@@ -137,7 +183,7 @@ az containerapp job execution list \
   -o table
 ```
 
-### Step 8 — List all jobs in the environment
+### Step 9 — List all jobs in the environment
 
 ```bash
 az containerapp job list \
