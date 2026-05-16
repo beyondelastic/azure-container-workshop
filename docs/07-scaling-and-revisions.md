@@ -107,13 +107,12 @@ Save this — it is the "blue" revision.
 
 ### Step 6 — Deploy a new revision (green)
 
-Deploy with a label for easy identification:
+Deploy with a revision suffix and a new environment variable to distinguish it:
 
 ```bash
 az containerapp update \
   --name triage-backend \
   --resource-group $RESOURCE_GROUP \
-  --image $ACR_NAME.azurecr.io/triage-backend:v1 \
   --revision-suffix green \
   --set-env-vars "APP_VERSION=v2"
 ```
