@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 FROM node:18-alpine
-RUN apk add --no-cache nginx gettext && \
+RUN apk add --no-cache nginx gettext curl && \
     mkdir -p /usr/share/nginx/html /run/nginx && \
     rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist /usr/share/nginx/html
