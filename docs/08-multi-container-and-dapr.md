@@ -95,6 +95,10 @@ az containerapp dapr enable \
   --dapr-app-protocol http
 ```
 
+Enabling Dapr creates a new revision with a sidecar container. The sidecar
+injects the `DAPR_HTTP_PORT` environment variable — the backend code detects
+this and automatically switches from in-memory storage to the Dapr state store.
+
 ### Step 3 — Enable Dapr on the frontend
 
 ```bash
@@ -135,28 +139,7 @@ az containerapp env dapr-component set \
     For a managed Azure Cache for Redis you would add `enableTLS: "true"`,
     use port `6380`, and provide the access key via a Container Apps secret.
 
-### Step 5 — Rebuild and deploy the Dapr-aware backend
-
-The backend code has been updated to automatically use Dapr state when the
-`DAPR_HTTP_PORT` environment variable is present (set by the Dapr sidecar).
-When Dapr is not available (e.g. on AKS), it falls back to in-memory storage.
-
-Rebuild and deploy:
-
-```bash
-az acr build \
-  --registry $ACR_NAME \
-  --image triage-backend:latest \
-  --file app/backend/Dockerfile \
-  app/backend/
-
-az containerapp update \
-  --name triage-backend \
-  --resource-group $RESOURCE_GROUP \
-  --image "$ACR_NAME.azurecr.io/triage-backend:latest"
-```
-
-### Step 6 — Test service invocation
+### Step 5 — Test service invocation
 
 Dapr allows calling other services by app ID instead of a URL. Each sidecar
 listens on `localhost:3500` and routes requests to the target service via the
@@ -172,7 +155,7 @@ az containerapp exec \
 You should see the backend's health check JSON response, confirming that Dapr
 service invocation is working between containers.
 
-### Step 7 — Verify state persistence across replicas
+### Step 6 — Verify state persistence across replicas
 
 In Lesson 07 we saw that in-memory state is lost when requests hit different
 replicas. Now that the backend uses Dapr state backed by Redis, this is fixed.
@@ -184,7 +167,7 @@ data is now **always** visible regardless of which replica serves the request.
     All replicas now read and write to the same Redis-backed state store via
     Dapr. No more disappearing patients!
 
-### Step 8 — Test state via the Dapr API directly
+### Step 7 — Test state via the Dapr API directly
 
 You can also interact with the state store directly via the Dapr API:
 
@@ -206,7 +189,7 @@ az containerapp exec \
   --command "curl -s http://localhost:3500/v1.0/state/statestore/patient-001"
 ```
 
-### Step 9 — List Dapr components
+### Step 8 — List Dapr components
 
 ```bash
 az containerapp env dapr-component list \
