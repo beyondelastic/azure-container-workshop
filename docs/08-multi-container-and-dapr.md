@@ -138,18 +138,18 @@ az containerapp env dapr-component set \
 ### Step 5 — Test service invocation
 
 Dapr allows calling other services by app ID instead of a URL. Each sidecar
-listens on `localhost:3500` and routes via the mesh. Exec into the **backend**
-and invoke itself through Dapr to confirm the sidecar is working:
+listens on `localhost:3500` and routes requests to the target service via the
+mesh. Exec into the **frontend** and invoke the backend through Dapr:
 
 ```bash
 az containerapp exec \
-  --name triage-backend \
+  --name triage-frontend \
   --resource-group $RESOURCE_GROUP \
   --command "curl -s http://localhost:3500/v1.0/invoke/triage-backend/method/api/health"
 ```
 
-You should see the health check JSON response, confirming that Dapr service
-invocation is working.
+You should see the backend's health check JSON response, confirming that Dapr
+service invocation is working between containers.
 
 ### Step 6 — Test the state store
 
