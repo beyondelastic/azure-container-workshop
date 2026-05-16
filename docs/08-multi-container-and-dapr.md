@@ -150,7 +150,7 @@ Test via exec:
 az containerapp exec \
   --name triage-frontend \
   --resource-group $RESOURCE_GROUP \
-  --command -- curl -s http://localhost:3500/v1.0/invoke/triage-backend/method/api/health
+  --command "curl -s http://localhost:3500/v1.0/invoke/triage-backend/method/api/health"
 ```
 
 ### Step 6 — Test the state store
@@ -161,13 +161,7 @@ Save and retrieve state via Dapr:
 az containerapp exec \
   --name triage-backend \
   --resource-group $RESOURCE_GROUP \
-  --command -- sh -c '
-    curl -s -X POST http://localhost:3500/v1.0/state/statestore \
-      -H "Content-Type: application/json" \
-      -d "[{\"key\":\"patient-001\",\"value\":{\"name\":\"Jane Doe\",\"urgency\":\"High\"}}]"
-    echo ""
-    curl -s http://localhost:3500/v1.0/state/statestore/patient-001
-  '
+  --command "sh -c 'curl -s -X POST http://localhost:3500/v1.0/state/statestore -H \"Content-Type: application/json\" -d \"[{\\\"key\\\":\\\"patient-001\\\",\\\"value\\\":{\\\"name\\\":\\\"Jane Doe\\\",\\\"urgency\\\":\\\"High\\\"}}]\" && echo && curl -s http://localhost:3500/v1.0/state/statestore/patient-001'"
 ```
 
 ### Step 7 — List Dapr components
